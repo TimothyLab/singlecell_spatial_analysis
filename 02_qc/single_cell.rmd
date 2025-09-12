@@ -1,0 +1,122 @@
+---
+title: "Analyse de données de cellules uniques"
+author: "Timothy Labidi"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    number_sections: true
+    theme: readable
+    highlight: tango
+    df_print: paged
+    code_download: true
+---
+```{r}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,out.width = 14, out.height = 12)
+```
+
+# Chargement des packages
+```{r}
+library(Seurat)
+
+```
+
+
+
+# Chargement des données 
+```{r}
+
+mouse_brain = Load10X_Spatial( data.dir = "../01_preprocessing/sample1/outs/", assay = "Spatial", slice = "slice1")
+saveRDS(mouse_brain, file = "mouse_brain_raw.rds")
+
+```
+Ici on a un jeu de donnés de transcriptomique spatiale d'un cerveau de souris. Il contient 3353 gènes et 2696 spots. Un spot corresponds à une région du tissue et peut contenir plusieurs cellules. Nous appelerons ici un spot une cellule pour simplifier le langage.
+
+# Contrôle qualité 
+```{r}
+
+VlnPlot(mouse_brain, features = c("nCount_Spatial", "nFeature_Spatial"), ncol = 2)
+```
+Ici nCount_Spatial correspond au nombre total de molécules d'ARN détectées dans chaque spot et nFeature_Spatial correspond au nombre de gènes détectés dans chaque spot. On remarque que certains spots ont un nombre très élevé de molécules d'ARN détectées. Cela peut être dû à la présence de cellules mortes ou à des artefacts techniques. On va donc filtrer les spots en fonction de ces métriques.
+
+
+## Filtre 
+```{r}
+mouse_brain <- subset(mouse_brain, subset = nFeature_Spatial > 50 & nFeature_Spatial < 200)
+
+```
+Après le filtre appliqué sur le nombre gène par spot (nFeature_Spatial), on passe de 2696 spots à 2256 spots.
+
+
+# Normalisation 
+
+```{r}
+library(sctransform)
+
+mouse_brain <- SCTransform(mouse_brain, assay = "Spatial", verbose = FALSE)
+
+```
+
+# Réduction de dimension et visualisation
+```{r}
+mouse_brain <- RunPCA(mouse_brain, assay = "SCT", verbose = FALSE)
+mouse_brain <- RunUMAP(mouse_brain, dims = 1:30)
+mouse_brain$
+```
+```{r}
+DimPlot(mouse_brain, reduction = "umap", group.by = "seurat_clusters")
+```
+
+
+# Clustering 
+
+```{r}
+mouse_brain <- FindNeighbors(mouse_brain, dims = 1:30)
+mouse_brain <- FindClusters(mouse_brain, resolution = 0.5)
+```
+
+# Visualisation
+```{r}
+SpatialDimPlot(mouse_brain, group.by = "seurat_clusters", label = TRUE ,pt.size.factor = 3, label.size = 3)
+
+
+FeaturePlot(mouse_brain, features = c("Snap25", "Mbp"))
+
+```
+# Annotation 
+
+```{r}
+markers <- FindAllMarkers(mouse_brain, assay = "SCT", only.pos = TRUE)
+head(markers)
+```
+# Visualtisation des marqueurs
+```{r, fig.width = 200%, fig.height = 200%}
+SpatialFeaturePlot(mouse_brain, features = markers$gene[1:6], ncol = 3, pt.size.factor = 3)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,1 @@
+spaceranger count --id sample1 --transcriptome ../refdata-gex-GRCm39-2024-A --fastqs data/Visium_FFPE_Mouse_Brain_fastqs --create-bam false --slide V11J26-127 --area B1 --image data/Visium_FFPE_Mouse_Brain_image.jpg --localcores 10
