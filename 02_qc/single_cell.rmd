@@ -14,7 +14,7 @@ output:
     code_download: true
 ---
 ```{r}
-knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,out.width = 14, out.height = 12)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, out.width = 14, out.height = 12)
 ```
 
 # Chargement des packages
@@ -32,22 +32,29 @@ mouse_brain = Load10X_Spatial( data.dir = "../01_preprocessing/sample1/outs/", a
 saveRDS(mouse_brain, file = "mouse_brain_raw.rds")
 
 ```
-Ici on a un jeu de donnés de transcriptomique spatiale d'un cerveau de souris. Il contient 3353 gènes et 2696 spots. Un spot corresponds à une région du tissue et peut contenir plusieurs cellules. Nous appelerons ici un spot une cellule pour simplifier le langage.
+Ici on a un jeu de donnés de transcriptomique spatiale d'un cerveau de souris. Il contient 19465 gènes et 2261 spots. Un spot corresponds à une région du tissue et peut contenir plusieurs cellules. Par abus de language un spot peut être appelé un cellule mais il y a bien une différence entre les deux.
 
 # Contrôle qualité 
 ```{r}
 
 VlnPlot(mouse_brain, features = c("nCount_Spatial", "nFeature_Spatial"), ncol = 2)
 ```
-Ici nCount_Spatial correspond au nombre total de molécules d'ARN détectées dans chaque spot et nFeature_Spatial correspond au nombre de gènes détectés dans chaque spot. On remarque que certains spots ont un nombre très élevé de molécules d'ARN détectées. Cela peut être dû à la présence de cellules mortes ou à des artefacts techniques. On va donc filtrer les spots en fonction de ces métriques.
+Ici nCount_Spatial correspond au nombre total de molécules d'ARN détectées dans chaque spot et nFeature_Spatial correspond au nombre de gènes détectés dans chaque spot. On remarque que certains spots ont un nombre très élevé de molécules d'ARN détectées. Cela peut être dû à la présence de cellules mortes ou à des artefacts techniques. On va donc filtrer les spots en fonction de ces métriques. Ici la profondeur de séquençage correspond au nombre total de molécules d'ARN détectées dans chaque spot (nCount_Spatial).
+
+Comment savoir si on a une bonne profondeur de séquençage ?
+- Si la profondeur de séquençage est trop faible, on risque de ne pas détecter suffisamment de gènes, ce qui peut biaiser les résultats.
+- Si la profondeur de séquençage est trop élevée, on risque de détecter des gènes qui ne sont pas réellement exprimés dans les cellules, ce qui peut également biaiser les résultats.
+Généralement une profondeur entre 20k et 50k lectures par spot/cellule. 
+
+Cependant il n'est pas nécessaire de filtrer sur la profondeur qui sera très bien géré par SCTransform. On va donc filtrer uniquement sur le nombre de gènes détectés par spot (nFeature_Spatial).
 
 
 ## Filtre 
 ```{r}
-mouse_brain <- subset(mouse_brain, subset = nFeature_Spatial > 50 & nFeature_Spatial < 200)
+mouse_brain <- subset(mouse_brain, subset = nFeature_Spatial > 2500 & nFeature_Spatial < 7800)
 
 ```
-Après le filtre appliqué sur le nombre gène par spot (nFeature_Spatial), on passe de 2696 spots à 2256 spots.
+Après le filtre appliqué sur le nombre gène par spot (nFeature_Spatial), on passe de 2261 spots à 2217 spots.
 
 
 # Normalisation 
@@ -59,11 +66,30 @@ mouse_brain <- SCTransform(mouse_brain, assay = "Spatial", verbose = FALSE)
 
 ```
 
+
+La fonction SCTransform normalise les données en utilisant un modèle de régression négative binomiale. Elle permet de corriger les effets techniques et biologiques, et de rendre les données comparables entre les spots. 
+
+Précisément, SCTransform modélise le comptage des gènes en utilisant une régression négative binomiale, ce qui permet de prendre en compte la nature discrète et surdispersée des données de comptage. Cette approche permet également de normaliser les données en fonction de la profondeur de séquençage et d'autres covariables techniques, tout en préservant les variations biologiques d'intérêt.
+
+Comment est appliqué SCTransform ?
+
+1. *Modélisation des données* : Pour chaque gène, SCTransform ajuste un modèle de régression négative binomiale en fonction de la profondeur de séquençage et d'autres covariables techniques (comme le pourcentage de gènes mitochondriaux, si disponible).
+
+2. *Calcul des résidus* : Les résidus du modèle ajusté sont calculés pour chaque gène dans chaque spot. Ces résidus représentent l'expression normalisée du gène, corrigée des effets techniques.
+
+3. *Transformation* : Les résidus sont ensuite transformés pour stabiliser la variance, souvent en utilisant une transformation logarithmique ou une autre transformation appropriée.
+
+*Définitions* :
+
+- Les résidus : Les résidus sont les différences entre les valeurs observées et les valeurs prédites par le modèle de régression. Dans le contexte de SCTransform, les résidus représentent l'expression normalisée des gènes après avoir corrigé les effets techniques.
+
+
+
 # Réduction de dimension et visualisation
 ```{r}
 mouse_brain <- RunPCA(mouse_brain, assay = "SCT", verbose = FALSE)
 mouse_brain <- RunUMAP(mouse_brain, dims = 1:30)
-mouse_brain$
+
 ```
 ```{r}
 DimPlot(mouse_brain, reduction = "umap", group.by = "seurat_clusters")
